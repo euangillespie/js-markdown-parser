@@ -1,0 +1,21 @@
+<html>
+<head>
+	<script src="parser.js"></script>
+	<script src="markdownfield.js"></script>
+	<script>
+		window.onload = function(){
+			var textBox = document.getElementById('markdown');
+			var submitButton = document.getElementById('submit');
+			var previewDiv = document.getElementById('preview');
+			submitButton.onclick = function(){
+				previewDiv.value = markdown.parse(textBox.value);
+			}
+		}
+	</script>
+</head>
+<body>
+	<textarea id="markdown" rows="10" cols="50"></textarea>
+	<button id="submit">Submit</button>
+	<textarea id="preview" style="display: block; width:300px; height: 200px;"></textarea>
+</body>
+</html>
