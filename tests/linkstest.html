@@ -1,0 +1,41 @@
+inline link [example](http://example.com/ "Title") with title.<br/>
+<br/>
+[example](http://example.com/) with no title<br/>
+<br/>
+inline image link ![example](http://example.com/img.png "Title") with title.<br/>
+<br/>
+![example](http://example.com/) with no title<br/>
+<br/>
+reference style links that should have a title-<br/>
+This is [an example][id] reference-style link with a title.<br/>
+This is [an example] [id4] reference-style link.<br/>
+This is [an example] [id5] reference-style link.<br/>
+This is [an example] [id8] reference-style link which should have a title<br/>
+This is [an example][id] a reference-style image link
+<br/>
+reference links that should have no title-<br/>
+This is [an example] [id2] reference-style link.<br/>
+This is [an example][id3] reference-style link.<br/>
+This is [an example] [id7] reference-style link<br/>
+<br/>
+This is a [id] [] reference-style link whose title should be 'id'.<br/>
+<br/>
+reference links that shouldn't work-<br/>
+This is [an example][idx] reference-style link.<br/>
+This is [an example]  [id] reference-style link.<br/>
+This is [an example] [id6] reference-style link<br/>
+<br/>
+[id]: http://example.com/  "Optional Title Here"
+[id2]: http://example.com/
+   [id3]: http://example.com/
+[id4]: http://example.com/ 'Optional title here'
+[id5]: http://example.com/ (Optional title here)
+[id6]: http://example.com/ thisshouldbevisibleasitismalformed
+[id7]: <http://example.com/>
+[id8]: http://example.com/
+	"Some title"
+
+automatic link <http://www.example.com/><br/>
+<br/>
+email link <euan@somewhere.com><br/>
+<br/>
