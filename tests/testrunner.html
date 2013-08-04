@@ -1,21 +1,24 @@
 <html>
 <head>
-	<script src="parser.js"></script>
-	<script src="markdownfield.js"></script>
+	<script src="../parser.js"></script>
 	<script>
 		window.onload = function(){
-			var textBox = document.getElementById('markdown');
+			var textBox = document.getElementById('markdown-input');
 			var submitButton = document.getElementById('submit');
 			var previewDiv = document.getElementById('preview');
+			var previewRawDiv = document.getElementById('preview-raw');
 			submitButton.onclick = function(){
-				previewDiv.value = markdown.parse(textBox.value);
+				var output = markdown.parse(textBox.value);
+				previewRawDiv.value = output;
+				previewDiv.innerHTML = output;
 			}
 		}
 	</script>
 </head>
 <body>
-	<textarea id="markdown" rows="10" cols="50"></textarea>
+	<textarea id="markdown-input" rows="10" cols="50"></textarea>
 	<button id="submit">Submit</button>
-	<textarea id="preview" style="display: block; width:300px; height: 200px;"></textarea>
+	<textarea id="preview-raw" style="display: block; width:1000px; height: 200px;"></textarea>
+	<div id="preview"></div>
 </body>
 </html>
