@@ -3,6 +3,10 @@ markdown = (function(){
 
 	md.parse = function(text){
 		text = this.readReferences(text);
+		text = this.htmlEscape(text);
+		text = this.doInlineSubstitutions(text);
+		text = this.replaceLinks(text);
+		text = this.markDownEscape(text);
 		this.remainingInput = text.split('\n');
 		this.currentLine = this.remainingInput.shift();
 		this.output = '';
@@ -12,30 +16,15 @@ markdown = (function(){
 		return this.output;
 	}
 
-	md.processLine = function(escapeInlineHTML){
-		if (typeof escapeInlineHTML === 'undefined'){
-			escapeInlineHTML = false;
-		}
-		var line = this.currentLine
-		line = this.htmlEscape(line, escapeInlineHTML);
-		line = this.doInlineSubstitutions(line);
-		line = this.replaceLinks(line);
-		line = this.markDownEscape(line);
-		this.output += line;
-		this.popLine();
-	}
-
-
 	md.popLine = function(){
 		this.currentLine = this.remainingInput.shift();
 	}
 
 	md.readReferences = function(text){
-		// DOES NOT HANDLE <s around URLs, or titles on next line
 		this.references = {};
-		//0-3 spaces, [name]:, 1-3 spaces, url (anything except spaces and ",',( ),
+		//0-3 spaces, [name]:, 1-3 spaces, url (anything except spaces and ",',(, )s, possible with < and > around)
 		// an optional title in ", ' or (s, then optional whitespace
-		var referenceRe = /^(?:[ ]{0,3})\[([^\]]+)\]:[ ]{1,3}([^ "'(\n\r]+)(?:\s+["'(]([^"')]+)["')])?\s*$/gm;
+		var referenceRe = /^(?:[ ]{0,3})\[([^\]]+)\]:[ ]{1,3}<?([^ "'(\n\r]+?)>?(?:\s+["'(]([^"')]+)["')])?\s*$/gm;
 		text = text.replace(referenceRe, function(match, name, url, title){
 			title = title ? title.trim().toLowerCase() : undefined;
 			md.references[name] = {
@@ -49,28 +38,10 @@ markdown = (function(){
 
 	///////////////////////// Escaping
 
-	md.escapeChars = [
-		['\\', new RegExp('[\\\\]', 'g')],
-		['`', new RegExp('\\`', 'g')],
-		['*', new RegExp('\\\\\\*', 'g')],
-		['_', new RegExp('\\_', 'g')],
-		['{', new RegExp('\\\\\\{', 'g')],
-		['[', new RegExp('\\\\\\[', 'g')],
-		['(', new RegExp('\\\\\\(', 'g')],
-		['#', new RegExp('\\#', 'g')],
-		['+', new RegExp('\\\\\\+', 'g')],
-		['-', new RegExp('\\-', 'g')],
-		['.', new RegExp('\\\\\\.', 'g')],
-		['!', new RegExp('\\!', 'g')],
-	]
-
 	md.markDownEscape = function(text){
-		var escapeData;
-		for (var i = 0; i < this.escapeChars.length; i++){
-			escapeData = this.escapeChars[i];
-			text = text.replace(escapeData[1], escapeData[0]);
-		}
-		return text;
+		return text.replace(/\\[\\`*_(){}\[\]#+-.!]/g, function(match){
+			return match.slice(1);
+		});
 	}
 
 	md.htmlEscape = function(text, escapeInlineHTML){
@@ -80,7 +51,7 @@ markdown = (function(){
 			if (match.match(/^&.{1,6};/)){
 				return match;
 			} else {
-				return '&amp;'
+				return '&amp;' + match.slice(1);
 			}
 		});
 		// Replace < and > with &lt; and &gt;, but skip inline html unless
@@ -88,11 +59,11 @@ markdown = (function(){
 		if (escapeInlineHTML){
 			text = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 		} else {
-			text = text.replace(/<.?/g, function(match, offset){
+			text = text.replace(/<[\s\S]?/g, function(match, offset){
 				if (match.match(/^<[a-zA-Z\/]/)){
 					return match;
 				} else {
-					return '&lt;';
+					return '&lt;' + match.slice(1);
 				}
 			});
 		}
@@ -109,44 +80,49 @@ markdown = (function(){
 		'_': 'em',
 	}
 
-	md.doInlineSubstitution = function(line, character, tag){
+	md.doInlineSubstitution = function(text, character, tag){
 		var openingTag = '<%s>'.replace('%s', tag);
 		var closingTag = '</%s>'.replace('%s', tag);
 		character = character.replace(/./g, function(character){ return '[' + character + ']'; });
-		// * at start of line or in middle of line but not after backslash
+		// * at start of text or in middle of text but not after backslash
 		var openingCharacter = '(?:^%c)|(?:[^\\\\]%c)'.replace(/%c/g, character);
 		// * that isn't after backslash or space
 		var closingCharacter = '(?:[^\\\\ ])%s'.replace('%s', character);;
 		// optional body (char that isn't space + some arbitary chars), then char that isn't space or backslash and character
-		var bodyAndClosingChar = '([^ ].*?)?([^\\\\ ]%c)'.replace('%c', character)
+		// [\s\S] matches any character, including newlines
+		var bodyAndClosingChar = '([^ ][\\S\\s]*?)?([^\\\\ ]%c)'.replace('%c', character)
 		var charRegexp = new RegExp('(%o)(?:%b)(.{0,1})'.replace('%o', openingCharacter).replace('%b', bodyAndClosingChar), 'g');
-		return line.replace(charRegexp, function(match, startChars, middle, endChars, after){
+		return text.replace(charRegexp, function(match, startChars, middle, endChars, after){
 			startChars = startChars.length > 1 ? startChars[0] : '';
 			endChars = endChars.length > 1 ? endChars[0] : '';
 			return startChars + openingTag + middle + endChars + closingTag + after;
 		});
 	}
 
-	md.doInlineSubstitutions = function(line){
+	md.doInlineSubstitutions = function(text){
 		for (var replacement in this.inlineReplacements){
 			if (this.inlineReplacements.hasOwnProperty(replacement)){
-				line = this.doInlineSubstitution(line, replacement, this.inlineReplacements[replacement]);
+				text = this.doInlineSubstitution(text, replacement, this.inlineReplacements[replacement]);
 			}
 		}
-		return line;
+		return text;
 	}
 
-	md.replaceLinks = function(line){
+	md.replaceLinks = function(text){
 		// [an example](http://example.com/ "optional title")
-		var inlineLink = /\[([^\]]+)\]\(([^ "(]+)(?:\s+["]([^"]+)["])\)/g;
-		line = line.replace(inlineLink, function(match, text, url, title){
+		var inlineLink = /(!?)\[([^\]]+)\]\(([^ "(]+)(?:\s+["]([^"]+)["])?\)/g;
+		text = text.replace(inlineLink, function(match, isImage, text, url, title){
 			title = title ? ' title="' + title + '"' : '';
-			return '<a href="' + url + '"' + title + '>' + text + '</a>';
+			if (isImage){
+				return '<img src="' + url + '" alt="' + text + '"' + title + '></img>'
+			} else {
+				return '<a href="' + url + '"' + title + '>' + text + '</a>';
+			}
 		});
 
 		// [an example][optional id]
-		var referenceLink = /\[([^\]]+)\][ ]?\[([^\]]*)\]/g;
-		line = line.replace(referenceLink, function(match, text, id){
+		var referenceLink = /(!?)\[([^\]]+)\][ ]?\[([^\]]*)\]/g;
+		text = text.replace(referenceLink, function(match, isImage, text, id){
 			var reference;
 			var title;
 			if (id === ''){
@@ -157,9 +133,25 @@ markdown = (function(){
 				return match;
 			}
 			title = reference.title ? ' title="' + reference.title + '"' : '';
-			return '<a href="' + reference.url + '"' + title + '>' + text + '</a>';
+			if (isImage){
+				return '<img src="' + reference.url + '" alt="' + text + +'"' + title + '></img>'
+			} else {
+				return '<a href="' + reference.url + '"' + title + '>' + text + '</a>';
+			}
 		});
-		return line;
+
+		// <http://www.example.com>
+		var autoLink = /<([a-zA-Z0-9]+:\/\/[^>< ]*)>/g;
+		text = text.replace(autoLink, function(match, url){
+			return '<a href="' + url + '">' + url + '</a>';
+		});
+		// <euan@example.com>
+		var emailLink = /<([^@ ]+@[^>. ]+\.[^>< ]+)>/g;
+		text = text.replace(emailLink, function(match, url){
+			return '<a href="mailto:' + url + '">' + url + '</a>';
+		});
+
+		return text;
 	}
 
 
@@ -192,6 +184,13 @@ markdown = (function(){
 	md.processBlank = function(){
 		this.popLine();
 	}
+
+
+	md.processLine = function(){
+		this.output += this.currentLine;
+		this.popLine();
+	}
+
 
 	md.markupBlock = function(blockType, blockTag){
 		var line;
