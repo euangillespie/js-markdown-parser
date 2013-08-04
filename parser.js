@@ -3,17 +3,13 @@ markdown = (function(){
 
 	md.parse = function(text){
 		text = this.readReferences(text);
-		text = this.htmlEscape(text);
+		text = this.replaceHeadings(text);
+		text = this.replaceRules(text);
 		text = this.doInlineSubstitutions(text);
 		text = this.replaceLinks(text);
+		text = this.htmlEscape(text);
 		text = this.markDownEscape(text);
-		this.remainingInput = text.split('\n');
-		this.currentLine = this.remainingInput.shift();
-		this.output = '';
-		while (typeof(this.currentLine) !== 'undefined'){
-			this.processBlock();
-		}
-		return this.output;
+		return text;
 	}
 
 	md.popLine = function(){
@@ -95,6 +91,7 @@ markdown = (function(){
 		return text.replace(charRegexp, function(match, startChars, middle, endChars, after){
 			startChars = startChars.length > 1 ? startChars[0] : '';
 			endChars = endChars.length > 1 ? endChars[0] : '';
+			middle = middle || '';
 			return startChars + openingTag + middle + endChars + closingTag + after;
 		});
 	}
@@ -157,60 +154,50 @@ markdown = (function(){
 
 ///////////////////////////////////////////////// Block elements
 
+	md.replaceHeadings = function(text){
+		// heading
+		// -------
+		var setextHeading1 = /^(.*)\n[=]+$/gm;
+		text = text.replace(setextHeading1, function(match, content){
+			return '<h1>' + content.trim() + '</h1>';
+		});
+		var setextHeading2 = /^(.*)\n[-]+$/gm;
+		text = text.replace(setextHeading2, function(match, content){
+			return '<h2>' + content.trim() + '</h2>';
+		});
 
-	md.getBlockProcessor = function(){
-		if (typeof(this.currentLine) === 'undefined'){
-			return md.blockProcessors.COMPLETE;
-		} else {
-			var trimmedLine = this.currentLine.trimLeft();
+
+		// ###heading###
+		var atxHeading = /^(#+)(.*?)#*$/gm;
+		text = text.replace(atxHeading, function(match, opening, content){
+			var tag = 'h' + (Math.min(opening.length, 6)).toString();
+			return '<' + tag + '>' + content.trim() + '</' + tag + '>';
+		});
+
+		return text;
+	}
+
+	md.replaceRules = function(text){
+		// --------, _________ or ****** (with possible spaces)
+		var rules = [
+			/^[-][- ]+$/gm,
+			/^[_][_ ]+$/gm,
+			/^[*][* ]+$/gm
+		];
+		var doRuleReplacement = function(match){
+			match = match.replace(' ', '');
+			if (match.length >= 3){
+				return '<hr/>';
+			} else {
+				return match;
+			}
+		};
+		for (var i = 0; i < rules.length; i++){
+			(function(rule){
+				text = text.replace(rule, doRuleReplacement);
+			})(rules[i]);
 		}
-		if (trimmedLine === ''){
-			return md.blockProcessors.BLANK;
-//		} else if (trimmedLine.slice(0, 2).match(/^[-,*,+] .*/)){
-//			return md.blockProcessors.UNORDERED_LIST;
-//		} else if (trimmedLine.slice(0, 2).match(/^\d+\..*/)){
-//			return md.blockProcessors.ORDERED_LIST;
-		} else {
-			return md.blockProcessors.PARAGRAPH;
-		}
-	}
-
-
-	md.processBlock = function(){
-		var processor = this.getBlockProcessor();
-		processor();
-	}
-
-	md.processBlank = function(){
-		this.popLine();
-	}
-
-
-	md.processLine = function(){
-		this.output += this.currentLine;
-		this.popLine();
-	}
-
-
-	md.markupBlock = function(blockType, blockTag){
-		var line;
-		var lineType;
-		this.output += '<' + blockTag + '>';
-		while (typeof(lineType) === 'undefined' || lineType === blockType){
-			this.processLine();
-			lineType = this.getBlockProcessor();
-		}
-		this.output += '</' + blockTag + '>';
-	}
-
-	md.processParagraph = function(){
-		this.markupBlock(md.blockProcessors.PARAGRAPH, 'p');
-	}
-
-	md.blockProcessors = {
-		COMPLETE: function(){},
-		BLANK: function(){ md.processBlank(); },
-		PARAGRAPH: function(){ md.processParagraph(); },
+		return text;
 	}
 
 	return md;
