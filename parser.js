@@ -1,13 +1,26 @@
 markdown = (function(){
 	var md = {};
 
-	md.parse = function(text){
+	md.parseDocument = function(text){
 		text = this.readReferences(text);
+		return this.parseText(text);
+	}
+
+	md.parseText = function(text){
+		// Strip insignificant initial whitespace
+		text = text.replace(/^[ ]{1,3}(\S)/gm, function(match, nextChar){
+			return nextChar;
+		});
+		text = this.replaceLineBreaks(text);
+		text = this.replaceLists(text);
+		text = this.replaceBlockQuotes(text);
+		text = this.replaceCodeBlocks(text);
 		text = this.replaceHeadings(text);
 		text = this.replaceRules(text);
+		text = this.htmlEscape(text);
+		text = this.replaceParagraphs(text);
 		text = this.doInlineSubstitutions(text);
 		text = this.replaceLinks(text);
-		text = this.htmlEscape(text);
 		text = this.markDownEscape(text);
 		return text;
 	}
@@ -34,8 +47,22 @@ markdown = (function(){
 
 	///////////////////////// Escaping
 
+	md.escapeableChars = '[\\\\`*_(){}\\[\\]#+-.!]';
+
+	md.escapeText = function(text){
+		// Replace all escape-able characters with their escapes (unless they're escaped already)
+		return text.replace(new RegExp('(.?)(' + this.escapeableChars + ')', 'g'), function(match, firstChar, escapeChar){
+			if (firstChar === '\\'){
+				return match;
+			} else {
+				return firstChar + '\\' + escapeChar;
+			}
+		});
+	}
+
 	md.markDownEscape = function(text){
-		return text.replace(/\\[\\`*_(){}\[\]#+-.!]/g, function(match){
+		// Replace escape sequences with their characters (eg \\ -> \, \* -> *)
+		return text.replace(new RegExp('\\\\' + this.escapeableChars, 'g'), function(match){
 			return match.slice(1);
 		});
 	}
@@ -154,6 +181,62 @@ markdown = (function(){
 
 ///////////////////////////////////////////////// Block elements
 
+	md.replaceLineBreaks = function(text){
+		return text.replace(/[ ]{2}[ ]*\n/g, '<br/>\n');
+	}
+
+	md.replaceLists = function(text){
+		// Blocks with -/+/* at start of each line or paragraph
+		var unorderedList = /(?:^[\-+*]\s+.*(?:\n|$))(?:^(?:(?:[\-+*]\s+.*)|(?:.+))(?:\n|$))*/gm;
+		text = text.replace(unorderedList, function(match){
+			// Replace list markers with <li>s
+			match = match.replace(/^[\-+*]([^\-+*]*)(?:\n|$)/gm, function(match, content){
+				return '<li>' + md.parseText(content) + '</li>';
+			});
+			// Recursively parse contents of the list
+			return '<ul>' + match + '</ul>';
+		});
+
+		// Blocks with a number, followed by ., at the start of each line or paragraph
+		var orderedList = /(?:^\d+[.]\s+.*(?:\n|$))(?:^(?:(?:\d+[.]\s+.*)|(?:.+))(?:\n|$))*/gm;
+		text = text.replace(orderedList, function(match){
+			// Replace list markers with <li>s
+			// This checks for an opening list marker, any amount of content, and then a closing marker, end of input or empty line
+			match = match.replace(/^\d+.\s+([\s\S]*?)(?:(?:\d+.\s+)|(?:^\n)|$)/gm, function(match, content){
+				return '<li>' + md.parseText(content) + '</li>';
+			});
+			// Recursively parse contents of the list
+			return '<ol>' + match + '</ol>';
+		});
+		return text;
+	}
+
+	md.replaceBlockQuotes = function(text){
+		// Blocks with > at start of each line or paragraph
+		var blockQuote = /(?:^>.*\n?)(?:^(?:(?:>.*)|(.+))\n?)*/gm;
+		text = text.replace(blockQuote, function(match){
+			// Strip initial >
+			match = match.replace(/^>/gm, '');
+			// Recursively parse contents of the blockquote
+			match = md.parseText(match);
+			return '<blockquote>' + match + '</blockquote>';
+		});
+		return text;
+	}
+
+	md.replaceCodeBlocks = function(text){
+		// Anything indented by 4 or more spaces or 1 tab
+		var codeBlock = /(?:^(?:[ ]{4}|\t).*\n?)+/gm;
+		text = text.replace(codeBlock, function(match){
+			// Strip indent
+			match = match.replace(/^(?:\t|[ ]{4})/gm, '');
+			match = md.escapeText(match);
+			match = md.htmlEscape(match, true);
+			return '<pre><code>' + match + '</code></pre>';
+		});
+		return text;
+	}
+
 	md.replaceHeadings = function(text){
 		// heading
 		// -------
@@ -197,6 +280,18 @@ markdown = (function(){
 				text = text.replace(rule, doRuleReplacement);
 			})(rules[i]);
 		}
+		return text;
+	}
+
+	md.replaceParagraphs = function(text){
+		// Wrap <p>s around blocks of text, with spaces or lines of HTML in between
+		// This should be used after other block-level elements have been expanded, and
+		// before inline elements. Any escapeable HTML should have been escaped
+		// by this point.
+		var paragraph = /(?:^[^<\s].*(?:\n|$))+/gm;
+		text = text.replace(paragraph, function(match){
+			return '<p>' + match + '</p>';
+		});
 		return text;
 	}
 

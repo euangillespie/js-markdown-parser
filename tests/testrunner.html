@@ -8,7 +8,7 @@
 			var previewDiv = document.getElementById('preview');
 			var previewRawDiv = document.getElementById('preview-raw');
 			submitButton.onclick = function(){
-				var output = markdown.parse(textBox.value);
+				var output = markdown.parseDocument(textBox.value);
 				previewRawDiv.value = output;
 				previewDiv.innerHTML = output;
 			}
