@@ -12,14 +12,15 @@ markdown = (function(){
 			return nextChar;
 		});
 		text = this.replaceLineBreaks(text);
+		text = this.replaceCode(text);
 		text = this.replaceLists(text);
 		text = this.replaceBlockQuotes(text);
 		text = this.replaceCodeBlocks(text);
 		text = this.replaceHeadings(text);
 		text = this.replaceRules(text);
 		text = this.htmlEscape(text);
-		text = this.replaceParagraphs(text);
 		text = this.doInlineSubstitutions(text);
+		text = this.replaceParagraphs(text);
 		text = this.replaceLinks(text);
 		text = this.markDownEscape(text);
 		return text;
@@ -77,8 +78,6 @@ markdown = (function(){
 				return '&amp;' + match.slice(1);
 			}
 		});
-		// Replace < and > with &lt; and &gt;, but skip inline html unless
-		// escapeInlineHTML is true
 		if (escapeInlineHTML){
 			text = text.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 		} else {
@@ -96,7 +95,6 @@ markdown = (function(){
 	//////////////////////////////////////// Inline elements
 
 	md.inlineReplacements = {
-		'`': 'code',
 		'**': 'strong',
 		'__': 'strong',
 		'*': 'em',
@@ -121,6 +119,39 @@ markdown = (function(){
 			middle = middle || '';
 			return startChars + openingTag + middle + endChars + closingTag + after;
 		});
+	}
+
+	md.replaceCode = function(text){
+
+		// One or more backticks, not preceded by a backslash, optionally followed by spaces
+		var codeOpening = /(?:^|[^\\])(`+)/g;
+		var codeClosing;
+		var matchStart = codeOpening.exec(text);
+		var matchEnd;
+		var tickCount;
+		// As the (arbitrary) number of opening backticks must match the closing number,
+		// one RegExp replace won't do it. We need to first find opening backticks, then
+		// search for a closing set once we know what size to look for.
+		while (matchStart){
+			// The same number of backticks as opened the code block
+			tickCount = matchStart[1].length;
+			codeClosing = new RegExp('`{' + tickCount + '}', 'g');
+			codeClosing.lastIndex = codeOpening.lastIndex;
+			matchEnd = codeClosing.exec(text);
+			if (matchEnd){
+				match = text.slice(codeOpening.lastIndex, codeClosing.lastIndex - tickCount).trim();
+				// Code blocks can't contain empty lines - ignore this match if it does
+				if (!match.match(/\n\s*\n/)){
+					match = this.htmlEscape(match, true);
+					console.log('a' + match + 'a');
+					match = '<code>' + match + '</code>';
+					text = text.slice(0, codeOpening.lastIndex - tickCount) + match + text.slice(codeClosing.lastIndex);
+					codeOpening.lastIndex = codeOpening.lastIndex - tickCount + match.length;
+				}
+			}
+			matchStart = codeOpening.exec(text);
+		}
+		return text;
 	}
 
 	md.doInlineSubstitutions = function(text){
@@ -290,6 +321,9 @@ markdown = (function(){
 		// by this point.
 		var paragraph = /(?:^[^<\s].*(?:\n|$))+/gm;
 		text = text.replace(paragraph, function(match){
+			if (match[match.length-1] === '\n'){
+				match = match.slice(0, -1);
+			}
 			return '<p>' + match + '</p>';
 		});
 		return text;
