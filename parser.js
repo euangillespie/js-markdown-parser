@@ -374,21 +374,21 @@ markdown = (function(){
 			/// Pull out everything until the next paragraph end, surround with <p></p>
 			if (nextParagraphEnd !== lastParagraphEnd){
 				paragraphText = text.slice(lastParagraphEnd, nextParagraphEnd).trimLeft();
-				if (paragraphText[paragraphText.length - 1] === '\n'){
-					paragraphText = paragraphText.slice(0, -1);
-				}
 				if (paragraphText){
+					if (paragraphText[paragraphText.length - 1] === '\n'){
+						paragraphText = paragraphText.slice(0, -1);
+						nextParagraphEnd -= 1;
+					}
 					paragraphText = '<p>' + paragraphText + '</p>';
 					text = text.slice(0, lastParagraphEnd) + paragraphText + text.slice(nextParagraphEnd);
 					nextParagraphEnd = lastParagraphEnd + paragraphText.length + matchLength;
-				} else {
-					nextParagraphEnd += 1;
 				}
 			}
 			////// Go to the start of the next paragraph
 			if (matchCause === ''){
 				// Empty line - go to next line
 				paragraphStart = /^/m;
+				nextParagraphEnd += 1;
 			} else if (matchCause){
 				// HTML block level element - go just after it closes
 				paragraphStart = new RegExp('</' + matchCause + '>', 'g');
