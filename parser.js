@@ -15,10 +15,10 @@ markdown = (function(){
 			text = text.slice(0, -1);
 		}
 		text = this.replaceLineBreaks(text);
+		text = this.replaceCodeBlocks(text);
 		text = this.replaceCode(text);
 		text = this.replaceLists(text);
 		text = this.replaceBlockQuotes(text);
-		text = this.replaceCodeBlocks(text);
 		text = this.replaceHeadings(text);
 		text = this.replaceRules(text);
 		text = this.htmlEscape(text);
@@ -56,11 +56,7 @@ markdown = (function(){
 	md.escapeText = function(text){
 		// Replace all escape-able characters with their escapes (unless they're escaped already)
 		return text.replace(new RegExp('(.?)(' + this.escapeableChars + ')', 'g'), function(match, firstChar, escapeChar){
-			if (firstChar === '\\'){
-				return match;
-			} else {
-				return firstChar + '\\' + escapeChar;
-			}
+			return firstChar + '\\' + escapeChar;
 		});
 	}
 
@@ -143,6 +139,8 @@ markdown = (function(){
 			matchEnd = codeClosing.exec(text);
 			if (matchEnd){
 				match = text.slice(codeOpening.lastIndex, codeClosing.lastIndex - tickCount).trim();
+				match = md.escapeText(match);
+				match = md.htmlEscape(match, true);
 				// Code blocks can't contain empty lines - ignore this match if it does
 				if (!match.match(/\n\s*\n/)){
 					match = this.htmlEscape(match, true);
@@ -341,7 +339,6 @@ markdown = (function(){
 		// This should be used after other block-level elements have been expanded, and
 		// before inline elements. Any escapeable HTML should have been escaped
 		// by this point.
-		//var paragraph = /(?:^[^<\s].*(?:\n|$))+/gm;
 
 		var emptyLine = '(?:^\\s*(?:\\n|$))';
 		var blockLevelElement = this.htmlBlockLevelElements.join('|');
@@ -369,7 +366,6 @@ markdown = (function(){
 				} else {
 					matchCause = ''
 				}
-				matchCause = match[1] ? match[1].slice(1,-1) : '';
 			} else {
 				nextParagraphEnd = text.length;
 				matchLength = 0;
