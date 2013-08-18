@@ -11,6 +11,9 @@ markdown = (function(){
 		text = text.replace(/^[ ]{1,3}(\S)/gm, function(match, nextChar){
 			return nextChar;
 		});
+		if (text[text.length-1] == '\n'){
+			text = text.slice(0, -1);
+		}
 		text = this.replaceLineBreaks(text);
 		text = this.replaceCode(text);
 		text = this.replaceLists(text);
@@ -143,7 +146,6 @@ markdown = (function(){
 				// Code blocks can't contain empty lines - ignore this match if it does
 				if (!match.match(/\n\s*\n/)){
 					match = this.htmlEscape(match, true);
-					console.log('a' + match + 'a');
 					match = '<code>' + match + '</code>';
 					text = text.slice(0, codeOpening.lastIndex - tickCount) + match + text.slice(codeClosing.lastIndex);
 					codeOpening.lastIndex = codeOpening.lastIndex - tickCount + match.length;
@@ -314,18 +316,95 @@ markdown = (function(){
 		return text;
 	}
 
+	md.htmlBlockLevelElements = [
+		'^<blockquote(?: .*?)?>',
+		'^<div(?: .*?)?>',
+		'^<dl(?: .*?)?>',
+		'^<fieldset(?: .*?)?>',
+		'^<form(?: .*?)?>',
+		'^<h1(?: .*?)?>',
+		'^<h2(?: .*?)?>',
+		'^<h3(?: .*?)?>',
+		'^<h4(?: .*?)?>',
+		'^<h5(?: .*?)?>',
+		'^<h6(?: .*?)?>',
+		'^<hr(?: .*?)?>',
+		'^<ol(?: .*?)?>',
+		'^<p(?: .*?)?>',
+		'^<pre(?: .*?)?>',
+		'^<table(?: .*?)?>',
+		'^<ul(?: .*?)?>'
+	];
+
 	md.replaceParagraphs = function(text){
 		// Wrap <p>s around blocks of text, with spaces or lines of HTML in between
 		// This should be used after other block-level elements have been expanded, and
 		// before inline elements. Any escapeable HTML should have been escaped
 		// by this point.
-		var paragraph = /(?:^[^<\s].*(?:\n|$))+/gm;
-		text = text.replace(paragraph, function(match){
-			if (match[match.length-1] === '\n'){
-				match = match.slice(0, -1);
+		//var paragraph = /(?:^[^<\s].*(?:\n|$))+/gm;
+
+		var emptyLine = '(?:^\\s*(?:\\n|$))';
+		var blockLevelElement = this.htmlBlockLevelElements.join('|');
+		var paragraphEnd = new RegExp(emptyLine + '|(' + blockLevelElement + ')', 'gm');
+		var lineStart = /^/gm;
+
+		// Because paragraphs can end at any block level HTML element, but will accept inline ones
+		// a simple replace won't suffice. Instead, repeatedly look for paragraph end points and make
+		// everything up to them a paragraph
+		var lastParagraphEnd = 0;
+		var match;
+		var matchLength;
+		var matchCause;
+		var nextParagraphEnd;
+		var paragraphText;
+		var end;
+		while (lastParagraphEnd < text.length){
+			match = paragraphEnd.exec(text);
+			if (match){
+				nextParagraphEnd = match.index;
+				matchLength = match[0].length;
+				if (match[1]){
+					// Caused by HTML tag -> matchCause = tag name
+					matchCause = match[1].slice(1, match[1].indexOf(' '));
+				} else {
+					matchCause = ''
+				}
+				matchCause = match[1] ? match[1].slice(1,-1) : '';
+			} else {
+				nextParagraphEnd = text.length;
+				matchLength = 0;
+				matchCause = '';
 			}
-			return '<p>' + match + '</p>';
-		});
+			/// Pull out everything until the next paragraph end, surround with <p></p>
+			if (nextParagraphEnd !== lastParagraphEnd){
+				paragraphText = text.slice(lastParagraphEnd, nextParagraphEnd).trimLeft();
+				if (paragraphText[paragraphText.length - 1] === '\n'){
+					paragraphText = paragraphText.slice(0, -1);
+				}
+				if (paragraphText){
+					paragraphText = '<p>' + paragraphText + '</p>';
+					text = text.slice(0, lastParagraphEnd) + paragraphText + text.slice(nextParagraphEnd);
+					nextParagraphEnd = lastParagraphEnd + paragraphText.length + matchLength;
+				} else {
+					nextParagraphEnd += 1;
+				}
+			}
+			////// Go to the start of the next paragraph
+			if (matchCause === ''){
+				// Empty line - go to next line
+				paragraphStart = /^/m;
+			} else if (matchCause){
+				// HTML block level element - go just after it closes
+				paragraphStart = new RegExp('</' + matchCause + '>', 'g');
+			}
+			paragraphStart.lastIndex = nextParagraphEnd;
+			if (paragraphStart.exec(text) !== null){
+				paragraphEnd.lastIndex = paragraphStart.lastIndex;
+				lastParagraphEnd = paragraphEnd.lastIndex;
+			} else {
+				break;
+			}
+		}
 		return text;
 	}
 
