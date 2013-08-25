@@ -15,9 +15,9 @@ markdown = (function(){
 			text = text.slice(0, -1);
 		}
 		text = this.replaceLineBreaks(text);
+		text = this.replaceLists(text);
 		text = this.replaceCodeBlocks(text);
 		text = this.replaceCode(text);
-		text = this.replaceLists(text);
 		text = this.replaceBlockQuotes(text);
 		text = this.replaceHeadings(text);
 		text = this.replaceRules(text);
@@ -217,28 +217,52 @@ markdown = (function(){
 	}
 
 	md.replaceLists = function(text){
-		// Blocks with -/+/* at start of each line or paragraph
-		var unorderedList = /(?:^[\-+*]\s+.*(?:\n|$))(?:^(?:(?:[\-+*]\s+.*)|(?:.+))(?:\n|$))*/gm;
-		text = text.replace(unorderedList, function(match){
-			// Replace list markers with <li>s
-			match = match.replace(/^[\-+*]([^\-+*]*)(?:\n|$)/gm, function(match, content){
-				return '<li>' + md.parseText(content) + '</li>';
+		var handleList = function(listTag, listRe, listElementOpeningRe){
+			listElementOpeningRe.lastIndex = 0;
+			// First, find all occurrences of a full list in the text
+			return text.replace(listRe, function(fullList){
+				// Reset opening re position, as we're re-using it
+				listElementOpeningRe.lastIndex = 0;
+				var result = '';
+				var lastItemContentWasBlock = false;
+				var hasEndingNewLine;
+				var content;
+				var match = listElementOpeningRe.exec(fullList);
+				var currentLiContentStart = listElementOpeningRe.lastIndex;
+				var nextMatch = listElementOpeningRe.exec(fullList);
+				var nextLiStart = nextMatch ? nextMatch.index : fullList.length;
+				// Then, search for each li within each result
+				while (match){
+					content = fullList.slice(currentLiContentStart, nextLiStart);
+					hasEndingNewLine = content.match(/\n\s*\n$/);
+					content = content.trimRight();
+					// Remove a single leading tab or up to 4 leading spaces, as they is taken as a hanging indent
+					content = content.replace(/^(?:\t|(?:\s{1,4}))/gm, '');
+					// We'll parse the content of the <li> at the block level (eg, with surrounding <p>s)
+					// if there's an empty line at the end of it, or if the last one was block level. However, don't
+					// let the last element (or the only element) be block level unless the previous one was.
+					if (lastItemContentWasBlock || (hasEndingNewLine && nextMatch)){
+						result += '<li>' + md.parseText(content) + '</li>';
+					} else {
+						result += md.parseText('<li>' + content + '</li>');
+					}
+					lastItemContentWasBlock = hasEndingNewLine;
+					match = nextMatch;
+					currentLiContentStart = listElementOpeningRe.lastIndex;
+					nextMatch = listElementOpeningRe.exec(fullList);
+					nextLiStart = nextMatch ? nextMatch.index : fullList.length;
+				}
+				return '<' + listTag + '>' + result + '</' + listTag + '>';
 			});
-			// Recursively parse contents of the list
-			return '<ul>' + match + '</ul>';
-		});
+		}
 
-		// Blocks with a number, followed by ., at the start of each line or paragraph
-		var orderedList = /(?:^\d+[.]\s+.*(?:\n|$))(?:^(?:(?:\d+[.]\s+.*)|(?:.+))(?:\n|$))*/gm;
-		text = text.replace(orderedList, function(match){
-			// Replace list markers with <li>s
-			// This checks for an opening list marker, any amount of content, and then a closing marker, end of input or empty line
-			match = match.replace(/^\d+.\s+([\s\S]*?)(?:(?:\d+.\s+)|(?:^\n)|$)/gm, function(match, content){
-				return '<li>' + md.parseText(content) + '</li>';
-			});
-			// Recursively parse contents of the list
-			return '<ol>' + match + '</ol>';
-		});
+		var unorderedList = /(?:(?:^[\-+*]\s+.*(?:\n|$))(?:^(?:.+)(?:\n|$))*(?:^(\n|$))*)+/gm;
+		var unorderedListElementStart = /^[\-+*]/gm;
+		text = handleList('ul', unorderedList, unorderedListElementStart);
+
+		var orderedList = /(?:(?:^\d+[.]\s+.*(?:\n|$))(?:^(?:.+)(?:\n|$))*(?:^(\n|$))*)+/gm;
+		var orderedListElementStart = /^\d+[.]/gm;
+		text = handleList('ol', orderedList, orderedListElementStart);
 		return text;
 	}
 
@@ -327,6 +351,7 @@ markdown = (function(){
 		'^<h5(?: .*?)?>',
 		'^<h6(?: .*?)?>',
 		'^<hr(?: .*?)?>',
+		'^<li(?: .*?)?>',
 		'^<ol(?: .*?)?>',
 		'^<p(?: .*?)?>',
 		'^<pre(?: .*?)?>',
