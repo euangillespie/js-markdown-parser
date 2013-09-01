@@ -7,10 +7,12 @@ markdown = (function(){
 	}
 
 	md.parseText = function(text){
+		text = this.replaceHeadings(text);
 		// Strip insignificant initial whitespace
 		text = text.replace(/^[ ]{1,3}(\S)/gm, function(match, nextChar){
 			return nextChar;
 		});
+		text = this.replaceRules(text);
 		if (text[text.length-1] == '\n'){
 			text = text.slice(0, -1);
 		}
@@ -19,8 +21,6 @@ markdown = (function(){
 		text = this.replaceCodeBlocks(text);
 		text = this.replaceCode(text);
 		text = this.replaceBlockQuotes(text);
-		text = this.replaceHeadings(text);
-		text = this.replaceRules(text);
 		text = this.htmlEscape(text);
 		text = this.doInlineSubstitutions(text);
 		text = this.replaceParagraphs(text);
