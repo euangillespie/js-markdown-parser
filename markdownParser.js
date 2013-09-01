@@ -1,4 +1,4 @@
-markdown = (function(){
+markdownParser = (function(){
 	var md = {};
 
 	md.parseDocument = function(text){
