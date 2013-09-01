@@ -2,6 +2,8 @@
 
 This is a fairly straightforward Javascript parser for [Markdown][], which I wrote for a personal project that never quite came to anything. If you're looking for a practical Markdown parser, something like [markdown-js][] is probably a better bet - this project is not particularly mature or thoroughly tested. It's simplicity may make it useful as a starting point for some other Markdown-based processing, which is mostly why I'm keeping it around.
 
+Note that, because it was only intended for client-side processing, this parser doesn't do the email address mangling that the original Perl implementation does.
+
 ## Usage ##
 
 The code/markdownParser.js file contains everything. Include it and pass the markdownParser.parseDocument method a string of Markdown text to get HTML back. That's all there is to it.
