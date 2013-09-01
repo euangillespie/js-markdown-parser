@@ -270,8 +270,10 @@ markdown = (function(){
 		// Blocks indented with a >, followed by a paragraph and some empty lines
 		var blockQuote = /(?:(?:^>.*\n?)(?:^.+\n?)*(?:^\s\n?)*)+/gm;
 		text = text.replace(blockQuote, function(match){
-			// Strip initial >
-			match = match.replace(/^>/gm, '');
+			// Strip initial > and insignificant whitespace
+			match = match.replace(/^>?(?: {0,3}(\S))?/gm, function(match, nextChar){
+				return nextChar || '';
+			});
 			// Recursively parse contents of the blockquote
 			match = md.parseText(match);
 			return '<blockquote>' + match + '</blockquote>';
