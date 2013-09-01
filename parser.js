@@ -267,8 +267,8 @@ markdown = (function(){
 	}
 
 	md.replaceBlockQuotes = function(text){
-		// Blocks with > at start of each line or paragraph
-		var blockQuote = /(?:^>.*\n?)(?:^(?:(?:>.*)|(.+))\n?)*/gm;
+		// Blocks indented with a >, followed by a paragraph and some empty lines
+		var blockQuote = /(?:(?:^>.*\n?)(?:^.+\n?)*(?:^\s\n?)*)+/gm;
 		text = text.replace(blockQuote, function(match){
 			// Strip initial >
 			match = match.replace(/^>/gm, '');
@@ -281,7 +281,7 @@ markdown = (function(){
 
 	md.replaceCodeBlocks = function(text){
 		// Anything indented by 4 or more spaces or 1 tab
-		var codeBlock = /(?:^(?:[ ]{4}|\t).*\n?)+/gm;
+		var codeBlock = /(?:^(?:[ ]{4}|\t).*)(?:\n^(?:(?:(?:[ ]{4}|\t).*)|(?:\s*)))*(?:\n|$)/gm;
 		text = text.replace(codeBlock, function(match){
 			// Strip indent
 			match = match.replace(/^(?:\t|[ ]{4})/gm, '');
